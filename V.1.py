@@ -54,6 +54,35 @@ def get_tiktok_best_sellers(time_range="รายวัน", category="ทั้
         print(f"[{datetime.now()}] ข้อผิดพลาด OpenAI API: {e}")
         return "⚠️ ไม่สามารถดึงข้อมูลสินค้าจาก GPT ได้ในขณะนี้"
 
+def get_tiktok_idea(product_name):
+    """
+    ฟังก์ชันสำหรับดึงไอเดียทำคลิป TikTok จาก GPT-mini
+    """
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
+    
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "คุณคือครีเอทีฟและผู้เชี่ยวชาญการทำนายหน้า TikTok Shop สไตล์คนไทย หน้าที่คือคิดไอเดียทำคลิปขายของให้ปัง สั้น กระชับ แต่อิมแพค"},
+            {"role": "user", "content": f"ช่วยคิดไอเดียทำคลิป TikTok เพื่อขายสินค้านี้: '{product_name}'\nขอ 3 อย่าง:\n1. 🧲 Hook หยุดนิ้ว (ประโยคเปิดคลิป 3 วิแรก)\n2. 🎬 พล็อต/เนื้อเรื่องคลิปสั้นๆ (ทำยังไงให้คนดูจบ)\n3. 🛒 Call to Action (ประโยคปิดการขายให้คนกดตะกร้า)\n\nขอภาษาวัยรุ่น TikTok เข้าใจง่าย พิมพ์สั้นๆ เพื่อประหยัด Token"}
+        ],
+        "max_tokens": 800,
+        "temperature": 0.8
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        return data['choices'][0]['message']['content']
+    except Exception as e:
+        print(f"[{datetime.now()}] ข้อผิดพลาด OpenAI API (Idea): {e}")
+        return "⚠️ ไม่สามารถสร้างไอเดียได้ในขณะนี้"
+
 def send_telegram_message(message):
     """
     ฟังก์ชันสำหรับส่งข้อความไปยัง Telegram อัตโนมัติ
@@ -89,9 +118,26 @@ def send_menu(message):
     # สร้างคีย์บอร์ดปุ่มกด
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = KeyboardButton("📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
-    markup.add(btn1)
+    btn2 = KeyboardButton("💡 ผู้ช่วยหาไอเดียทำคลิป")
+    markup.add(btn1, btn2)
     
     bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == "💡 ผู้ช่วยหาไอเดียทำคลิป")
+def prompt_idea_help(message):
+    help_text = "🎬 **ผู้ช่วยหาไอเดียทำคลิป (Hook & Script)**\n\nพิมพ์คำสั่ง `/idea [ตามด้วยชื่อสินค้า]` แล้วส่งมาให้ผมได้เลยครับ!\n\nตัวอย่าง:\n`/idea เซรั่มลดสิว`\n`/idea กางเกงช้าง`\n\nเดี๋ยวผมจะช่วยคิดประโยคหยุดนิ้วและพล็อตคลิปปังๆ ให้ครับ! 🔥"
+    bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
+
+@bot.message_handler(commands=['idea'])
+def handle_idea_command(message):
+    text = message.text.replace('/idea', '').strip()
+    if not text:
+        bot.reply_to(message, "⚠️ กรุณาพิมพ์ชื่อสินค้าด้วยครับ เช่น `/idea กางเกงช้าง`", parse_mode='Markdown')
+        return
+    
+    bot.reply_to(message, f"กำลังคิดไอเดียปังๆ สำหรับ **{text}**... รอสักครู่ 🎬", parse_mode='Markdown')
+    idea_text = get_tiktok_idea(text)
+    bot.send_message(message.chat.id, f"💡 **ไอเดียปั้นคลิป: {text}**\n\n{idea_text}")
 
 @bot.message_handler(commands=['check', 'trend'])
 @bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
