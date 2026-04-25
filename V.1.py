@@ -87,6 +87,7 @@ def send_menu(message):
     
     bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
 
+@bot.message_handler(commands=['check', 'trend'])
 @bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
 def manual_report(message):
     # ฟังก์ชันตอบสนองเมื่อผู้ใช้กดปุ่ม
