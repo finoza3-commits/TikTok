@@ -12,14 +12,38 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'ใส่_TOKEN_ของบอทคุณที่นี่')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', 'ใส่_CHAT_ID_ของกลุ่มหรือของคุณที่นี่')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', 'ใส่_OPENAI_API_KEY_ของคุณที่นี่')
+GOOGLE_SHEET_WEBHOOK_URL = os.environ.get('GOOGLE_SHEET_WEBHOOK_URL', '') # ใส่ Webhook URL ถ้ามี
 # ============================================
 
 app = Flask(__name__)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
+def is_authorized(chat_id):
+    """ฟังก์ชันเช็คสิทธิ์การใช้งาน (ป้องกันคนนอก)"""
+    # ถ้าไม่ใช่แชท ID ที่ตั้งไว้ จะไม่ให้ใช้งาน (สามารถเพิ่มเป็น list ได้ถ้ามีหลายคน)
+    return str(chat_id) == str(TELEGRAM_CHAT_ID)
+
 @app.route('/')
 def home():
     return "TikTok Bot is running!"
+
+def log_to_google_sheets(time_range, category, content):
+    """
+    ฟังก์ชันส่งข้อมูลไปบันทึกลง Google Sheets อัตโนมัติ (ผ่าน Webhook)
+    """
+    if not GOOGLE_SHEET_WEBHOOK_URL:
+        return
+    try:
+        payload = {
+            "date": datetime.now().strftime('%d/%m/%Y %H:%M'),
+            "time_range": time_range,
+            "category": category,
+            "content": content
+        }
+        requests.post(GOOGLE_SHEET_WEBHOOK_URL, json=payload, timeout=10)
+        print(f"[{datetime.now()}] บันทึกข้อมูลลง Google Sheets สำเร็จ!")
+    except Exception as e:
+        print(f"[{datetime.now()}] ข้อผิดพลาด Google Sheets: {e}")
 
 def get_tiktok_best_sellers(time_range="รายวัน", category="ทั้งหมด"):
     """
@@ -49,14 +73,19 @@ def get_tiktok_best_sellers(time_range="รายวัน", category="ทั้
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
         data = response.json()
-        return data['choices'][0]['message']['content']
+        result_text = data['choices'][0]['message']['content']
+        
+        # ส่งข้อมูลไปบันทึกลง Google Sheets ทันทีที่ดึงข้อมูลสำเร็จ
+        log_to_google_sheets(time_range, category, result_text)
+        
+        return result_text
     except Exception as e:
         print(f"[{datetime.now()}] ข้อผิดพลาด OpenAI API: {e}")
         return "⚠️ ไม่สามารถดึงข้อมูลสินค้าจาก GPT ได้ในขณะนี้"
 
 def get_tiktok_idea(product_name):
     """
-    ฟังก์ชันสำหรับดึงไอเดียทำคลิป TikTok จาก GPT-mini
+    ฟังก์ชันสำหรับดึงไอเดียสินค้าจาก GPT-mini
     """
     url = "https://api.openai.com/v1/chat/completions"
     headers = {
@@ -115,7 +144,10 @@ def run_scheduler():
 # =================สร้างเมนูบอท=================
 @bot.message_handler(commands=['start', 'menu'])
 def send_menu(message):
-    # สร้างคีย์บอร์ดปุ่มกด
+    if not is_authorized(message.chat.id):
+        bot.send_message(message.chat.id, "⛔ คุณไม่มีสิทธิ์ใช้งานบอทนี้ครับ (Private Bot)")
+        return
+        
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = KeyboardButton("📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
     btn2 = KeyboardButton("💡 ผู้ช่วยหาไอเดียสินค้า")
@@ -125,11 +157,17 @@ def send_menu(message):
 
 @bot.message_handler(func=lambda message: message.text == "💡 ผู้ช่วยหาไอเดียสินค้า")
 def prompt_idea_help(message):
+    if not is_authorized(message.chat.id):
+        return
+        
     help_text = "💡 **ผู้ช่วยหาไอเดียสินค้าทำเงิน**\n\nพิมพ์คำสั่ง `/idea [ตามด้วยหมวดหมู่หรือคีย์เวิร์ด]` แล้วส่งมาให้ผมได้เลยครับ!\n\nตัวอย่าง:\n`/idea เสื้อผ้าผู้ชาย`\n`/idea ของใช้หน้าร้อน`\n`/idea แม่และเด็ก`\n\nเดี๋ยวผมจะช่วยคัด 3-5 ไอเดียสินค้าเจาะจงที่น่าเอาไปทำนายหน้ามาให้ครับ! 📦"
     bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['idea'])
 def handle_idea_command(message):
+    if not is_authorized(message.chat.id):
+        return
+        
     text = message.text.replace('/idea', '').strip()
     if not text:
         bot.reply_to(message, "⚠️ กรุณาพิมพ์คีย์เวิร์ดด้วยครับ เช่น `/idea เสื้อผ้าผู้ชาย`", parse_mode='Markdown')
@@ -142,7 +180,10 @@ def handle_idea_command(message):
 @bot.message_handler(commands=['check', 'trend'])
 @bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
 def prompt_time_range(message):
-    # ฟังก์ชันแสดงปุ่มเลือกช่วงเวลาเมื่อผู้ใช้กดเช็ค
+    if not is_authorized(message.chat.id):
+        bot.send_message(message.chat.id, "⛔ คุณไม่มีสิทธิ์ใช้งานบอทนี้ครับ")
+        return
+        
     markup = InlineKeyboardMarkup()
     btn_daily = InlineKeyboardButton("📅 รายวัน", callback_data="time_daily")
     btn_weekly = InlineKeyboardButton("🗓️ รายสัปดาห์", callback_data="time_weekly")
@@ -153,7 +194,9 @@ def prompt_time_range(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('time_'))
 def prompt_category(call):
-    # ผู้ใช้เลือกเวลาแล้ว ให้ถามหมวดหมู่ต่อ
+    if not is_authorized(call.message.chat.id):
+        return
+        
     time_selected = call.data.split('_')[1] # daily, weekly, monthly
     
     markup = InlineKeyboardMarkup(row_width=2)
@@ -174,8 +217,9 @@ def prompt_category(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('cat_'))
 def handle_report_callback(call):
-    # ผู้ใช้เลือกหมวดหมู่แล้ว ดึงข้อมูลและส่งรายงาน
-    # data: cat_daily_ทั้งหมด
+    if not is_authorized(call.message.chat.id):
+        return
+        
     parts = call.data.split('_')
     time_selected = parts[1]
     category = parts[2]
@@ -183,7 +227,6 @@ def handle_report_callback(call):
     time_th = {"daily": "รายวัน", "weekly": "รายสัปดาห์", "monthly": "รายเดือน"}
     time_range = time_th[time_selected]
     
-    # ลบปุ่มออกจากข้อความเดิม
     bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
     bot.send_message(call.message.chat.id, f"กำลังวิเคราะห์ข้อมูลแบบ **{time_range}** (หมวด: {category})... กรุณารอสักครู่ ⏳", parse_mode='Markdown')
     
@@ -203,14 +246,11 @@ def run_bot_polling():
             time.sleep(15)
 
 if __name__ == '__main__':
-    # 1. เริ่มการทำงานของ schedule ใน background thread
     t1 = threading.Thread(target=run_scheduler)
     t1.start()
     
-    # 2. เริ่มการทำงานของ Bot Polling (รอรับคำสั่งปุ่มกด)
     t2 = threading.Thread(target=run_bot_polling)
     t2.start()
     
-    # 3. รัน Web Server สำหรับให้ Render ผูก Port
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
