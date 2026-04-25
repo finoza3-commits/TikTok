@@ -6,7 +6,7 @@ import threading
 from datetime import datetime
 from flask import Flask
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
 # =================ตั้งค่าตัวแปร=================
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'ใส่_TOKEN_ของบอทคุณที่นี่')
@@ -21,7 +21,7 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 def home():
     return "TikTok Bot is running!"
 
-def get_tiktok_best_sellers():
+def get_tiktok_best_sellers(time_range="รายวัน"):
     """
     ฟังก์ชันสำหรับดึงข้อมูลสินค้าขายดีจาก TikTok โดยใช้ GPT-mini (OpenAI API)
     """
@@ -37,7 +37,7 @@ def get_tiktok_best_sellers():
         "model": "gpt-4o-mini",
         "messages": [
             {"role": "system", "content": f"คุณคือนักวิเคราะห์เทรนด์ TikTok Shop ไทย สรุปข้อมูลให้สั้น กระชับที่สุด ขณะนี้คือเดือน {current_month} (อิงสภาพอากาศปัจจุบันของไทย)"},
-            {"role": "user", "content": f"สรุปเทรนด์ TikTok ไทยประจำเดือน {current_month} แบ่งเป็น 2 ส่วน (ให้ได้รวม 10-15 สินค้า):\n1. 🔥 สินค้ากำลังดัน\n2. 💰 สินค้าขายดี\n\nบังคับรูปแบบการตอบแต่ละอันดับให้มี 'หมวดหมู่' ด้วย ดังนี้:\n[หมวดหมู่สินค้า] ชื่อสินค้า | เหตุผลที่ฮิต | ความเชื่อมโยงกับสภาพอากาศ/ฤดูกาลในเดือน {current_month}\n(พิมพ์ให้สั้นที่สุด ห้ามเกริ่นยาว เพื่อประหยัด Token)"}
+            {"role": "user", "content": f"สรุปเทรนด์ TikTok ไทยแบบ '{time_range}' อัปเดตล่าสุด แบ่งเป็น 2 ส่วน (ให้ได้รวม 10-15 สินค้า):\n1. 🔥 สินค้ากำลังดัน\n2. 💰 สินค้าขายดี\n\nบังคับรูปแบบการตอบแต่ละอันดับให้มี 'หมวดหมู่' ด้วย ดังนี้:\n[หมวดหมู่สินค้า] ชื่อสินค้า | เหตุผลที่ฮิต | ความเชื่อมโยงกับสภาพอากาศ/ฤดูกาลในเดือน {current_month}\n(พิมพ์ให้สั้นที่สุด ห้ามเกริ่นยาว เพื่อประหยัด Token)"}
         ],
         "max_tokens": 800,
         "temperature": 0.7
@@ -67,9 +67,9 @@ def daily_job():
     งานที่จะให้ทำทุกวันเวลา 04:30
     """
     print("กำลังดึงข้อมูลและส่งรายงานอัตโนมัติ...")
-    data = get_tiktok_best_sellers()
+    data = get_tiktok_best_sellers("รายวัน")
     today_date = datetime.now().strftime('%d/%m/%Y')
-    message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
+    message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย (รายวัน) ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
     send_telegram_message(message)
 
 # =================การตั้งเวลา=================
@@ -93,13 +93,37 @@ def send_menu(message):
 
 @bot.message_handler(commands=['check', 'trend'])
 @bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
-def manual_report(message):
-    # ฟังก์ชันตอบสนองเมื่อผู้ใช้กดปุ่ม
-    bot.send_message(message.chat.id, "กำลังวิเคราะห์ข้อมูล... กรุณารอสักครู่ ⏳")
-    data = get_tiktok_best_sellers()
+def prompt_time_range(message):
+    # ฟังก์ชันแสดงปุ่มเลือกช่วงเวลาเมื่อผู้ใช้กดเช็ค
+    markup = InlineKeyboardMarkup()
+    btn_daily = InlineKeyboardButton("📅 รายวัน", callback_data="report_daily")
+    btn_weekly = InlineKeyboardButton("🗓️ รายสัปดาห์", callback_data="report_weekly")
+    btn_monthly = InlineKeyboardButton("📊 รายเดือน", callback_data="report_monthly")
+    # ใส่ 3 ปุ่มลงไป
+    markup.add(btn_daily, btn_weekly, btn_monthly)
+    
+    bot.send_message(message.chat.id, "กรุณาเลือกระยะเวลาของรายงานที่ต้องการเช็คครับ 👇", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('report_'))
+def handle_report_callback(call):
+    # ลบปุ่มออกจากข้อความเดิม
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    
+    # กำหนดคำค้นหา
+    if call.data == "report_daily":
+        time_range = "รายวัน"
+    elif call.data == "report_weekly":
+        time_range = "รายสัปดาห์"
+    else:
+        time_range = "รายเดือน"
+        
+    bot.send_message(call.message.chat.id, f"กำลังวิเคราะห์ข้อมูลแบบ **{time_range}**... กรุณารอสักครู่ ⏳", parse_mode='Markdown')
+    
+    data = get_tiktok_best_sellers(time_range)
     today_date = datetime.now().strftime('%d/%m/%Y')
-    report_message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
-    bot.send_message(message.chat.id, report_message)
+    report_message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย ({time_range}) ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
+    
+    bot.send_message(call.message.chat.id, report_message)
 
 def run_bot_polling():
     print("บอทพร้อมรับคำสั่งจากผู้ใช้แล้ว...")
