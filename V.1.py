@@ -67,8 +67,8 @@ def get_tiktok_idea(product_name):
     payload = {
         "model": "gpt-4o-mini",
         "messages": [
-            {"role": "system", "content": "คุณคือครีเอทีฟและผู้เชี่ยวชาญการทำนายหน้า TikTok Shop สไตล์คนไทย หน้าที่คือคิดไอเดียทำคลิปขายของให้ปัง สั้น กระชับ แต่อิมแพค"},
-            {"role": "user", "content": f"ช่วยคิดไอเดียทำคลิป TikTok เพื่อขายสินค้านี้: '{product_name}'\nขอ 3 อย่าง:\n1. 🧲 Hook หยุดนิ้ว (ประโยคเปิดคลิป 3 วิแรก)\n2. 🎬 พล็อต/เนื้อเรื่องคลิปสั้นๆ (ทำยังไงให้คนดูจบ)\n3. 🛒 Call to Action (ประโยคปิดการขายให้คนกดตะกร้า)\n\nขอภาษาวัยรุ่น TikTok เข้าใจง่าย พิมพ์สั้นๆ เพื่อประหยัด Token"}
+            {"role": "system", "content": "คุณคือนักสืบและผู้เชี่ยวชาญหาสินค้าทำเงินใน TikTok Shop ไทย หน้าที่ของคุณคือแนะนำ 'ไอเดียสินค้าเจาะจง' ที่กำลังมาแรง เพื่อให้ผู้ใช้นำไปต่อยอดทำนายหน้า"},
+            {"role": "user", "content": f"ช่วยแนะนำไอเดียสินค้าที่น่าเอามาทำนายหน้าในหมวดหมู่/คีย์เวิร์ดนี้: '{product_name}'\nขอ 3-5 สินค้าแบบเจาะจง (ห้ามกว้างเกินไป)\nพร้อมบอก 'จุดขายสั้นๆ' และ 'เหตุผลที่คนจะซื้อช่วงนี้'\n(พิมพ์สั้นๆ กระชับ ห้ามเกริ่นยาว เพื่อประหยัด Token)"}
         ],
         "max_tokens": 800,
         "temperature": 0.8
@@ -118,26 +118,26 @@ def send_menu(message):
     # สร้างคีย์บอร์ดปุ่มกด
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = KeyboardButton("📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
-    btn2 = KeyboardButton("💡 ผู้ช่วยหาไอเดียทำคลิป")
+    btn2 = KeyboardButton("💡 ผู้ช่วยหาไอเดียสินค้า")
     markup.add(btn1, btn2)
     
     bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: message.text == "💡 ผู้ช่วยหาไอเดียทำคลิป")
+@bot.message_handler(func=lambda message: message.text == "💡 ผู้ช่วยหาไอเดียสินค้า")
 def prompt_idea_help(message):
-    help_text = "🎬 **ผู้ช่วยหาไอเดียทำคลิป (Hook & Script)**\n\nพิมพ์คำสั่ง `/idea [ตามด้วยชื่อสินค้า]` แล้วส่งมาให้ผมได้เลยครับ!\n\nตัวอย่าง:\n`/idea เซรั่มลดสิว`\n`/idea กางเกงช้าง`\n\nเดี๋ยวผมจะช่วยคิดประโยคหยุดนิ้วและพล็อตคลิปปังๆ ให้ครับ! 🔥"
+    help_text = "💡 **ผู้ช่วยหาไอเดียสินค้าทำเงิน**\n\nพิมพ์คำสั่ง `/idea [ตามด้วยหมวดหมู่หรือคีย์เวิร์ด]` แล้วส่งมาให้ผมได้เลยครับ!\n\nตัวอย่าง:\n`/idea เสื้อผ้าผู้ชาย`\n`/idea ของใช้หน้าร้อน`\n`/idea แม่และเด็ก`\n\nเดี๋ยวผมจะช่วยคัด 3-5 ไอเดียสินค้าเจาะจงที่น่าเอาไปทำนายหน้ามาให้ครับ! 📦"
     bot.send_message(message.chat.id, help_text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['idea'])
 def handle_idea_command(message):
     text = message.text.replace('/idea', '').strip()
     if not text:
-        bot.reply_to(message, "⚠️ กรุณาพิมพ์ชื่อสินค้าด้วยครับ เช่น `/idea กางเกงช้าง`", parse_mode='Markdown')
+        bot.reply_to(message, "⚠️ กรุณาพิมพ์คีย์เวิร์ดด้วยครับ เช่น `/idea เสื้อผ้าผู้ชาย`", parse_mode='Markdown')
         return
     
     bot.reply_to(message, f"กำลังคิดไอเดียปังๆ สำหรับ **{text}**... รอสักครู่ 🎬", parse_mode='Markdown')
     idea_text = get_tiktok_idea(text)
-    bot.send_message(message.chat.id, f"💡 **ไอเดียปั้นคลิป: {text}**\n\n{idea_text}")
+    bot.send_message(message.chat.id, f"💡 **ไอเดียสินค้าทำเงิน: {text}**\n\n{idea_text}")
 
 @bot.message_handler(commands=['check', 'trend'])
 @bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
