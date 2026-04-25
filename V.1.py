@@ -65,7 +65,7 @@ def daily_job():
     print("กำลังดึงข้อมูลและส่งรายงานอัตโนมัติ...")
     data = get_tiktok_best_sellers()
     today_date = datetime.now().strftime('%Y-%m-%d')
-    message = f"📊 **รายงานสินค้าขายดี TikTok ประจำวัน** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
+    message = f"🔥 **รายงานสินค้ากระแสมาแรง & ขายดี TikTok** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
     send_telegram_message(message)
 
 # =================การตั้งเวลา=================
@@ -82,18 +82,18 @@ def run_scheduler():
 def send_menu(message):
     # สร้างคีย์บอร์ดปุ่มกด
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = KeyboardButton("📊 ขอรายงานวันนี้")
+    btn1 = KeyboardButton("🔥 ดึงเทรนด์สินค้ากำลังดัน")
     markup.add(btn1)
     
     bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: message.text == "📊 ขอรายงานวันนี้")
+@bot.message_handler(func=lambda message: message.text == "🔥 ดึงเทรนด์สินค้ากำลังดัน")
 def manual_report(message):
     # ฟังก์ชันตอบสนองเมื่อผู้ใช้กดปุ่ม
     bot.send_message(message.chat.id, "กำลังวิเคราะห์ข้อมูล... กรุณารอสักครู่ ⏳")
     data = get_tiktok_best_sellers()
     today_date = datetime.now().strftime('%Y-%m-%d')
-    report_message = f"📊 **รายงานสินค้าขายดี TikTok ประจำวัน** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
+    report_message = f"🔥 **รายงานสินค้ากระแสมาแรง & ขายดี TikTok** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
     bot.send_message(message.chat.id, report_message)
 
 def run_bot_polling():
