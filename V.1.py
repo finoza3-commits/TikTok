@@ -12,7 +12,6 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'ใส่_TOKEN_ของบอทคุณที่นี่')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', 'ใส่_CHAT_ID_ของกลุ่มหรือของคุณที่นี่')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', 'ใส่_OPENAI_API_KEY_ของคุณที่นี่')
-GOOGLE_SHEET_WEBHOOK_URL = os.environ.get('GOOGLE_SHEET_WEBHOOK_URL', '') # ใส่ Webhook URL ถ้ามี
 # ============================================
 
 app = Flask(__name__)
@@ -26,24 +25,6 @@ def is_authorized(chat_id):
 @app.route('/')
 def home():
     return "TikTok Bot is running!"
-
-def log_to_google_sheets(time_range, category, content):
-    """
-    ฟังก์ชันส่งข้อมูลไปบันทึกลง Google Sheets อัตโนมัติ (ผ่าน Webhook)
-    """
-    if not GOOGLE_SHEET_WEBHOOK_URL:
-        return
-    try:
-        payload = {
-            "date": datetime.now().strftime('%d/%m/%Y %H:%M'),
-            "time_range": time_range,
-            "category": category,
-            "content": content
-        }
-        requests.post(GOOGLE_SHEET_WEBHOOK_URL, json=payload, timeout=10)
-        print(f"[{datetime.now()}] บันทึกข้อมูลลง Google Sheets สำเร็จ!")
-    except Exception as e:
-        print(f"[{datetime.now()}] ข้อผิดพลาด Google Sheets: {e}")
 
 def get_tiktok_best_sellers(time_range="รายวัน", category="ทั้งหมด"):
     """
@@ -74,9 +55,6 @@ def get_tiktok_best_sellers(time_range="รายวัน", category="ทั้
         response.raise_for_status()
         data = response.json()
         result_text = data['choices'][0]['message']['content']
-        
-        # ส่งข้อมูลไปบันทึกลง Google Sheets ทันทีที่ดึงข้อมูลสำเร็จ
-        log_to_google_sheets(time_range, category, result_text)
         
         return result_text
     except Exception as e:
