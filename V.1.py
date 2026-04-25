@@ -1,66 +1,119 @@
+import os
 import requests
 import schedule
 import time
+import threading
 from datetime import datetime
+from flask import Flask
+import telebot
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 
 # =================ตั้งค่าตัวแปร=================
-TELEGRAM_BOT_TOKEN = 'ใส่_TOKEN_ของบอทคุณที่นี่'
-TELEGRAM_CHAT_ID = 'ใส่_CHAT_ID_ของกลุ่มหรือของคุณที่นี่'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', 'ใส่_TOKEN_ของบอทคุณที่นี่')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', 'ใส่_CHAT_ID_ของกลุ่มหรือของคุณที่นี่')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', 'ใส่_OPENAI_API_KEY_ของคุณที่นี่')
 # ============================================
+
+app = Flask(__name__)
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+
+@app.route('/')
+def home():
+    return "TikTok Bot is running!"
 
 def get_tiktok_best_sellers():
     """
-    ฟังก์ชันสำหรับดึงข้อมูลจาก TikTok 
-    *หมายเหตุ: ในการใช้งานจริง คุณต้องเขียนโค้ดเชื่อมต่อกับ TikTok Shop API หรือ Web Scraper ที่นี่
+    ฟังก์ชันสำหรับดึงข้อมูลสินค้าขายดีจาก TikTok โดยใช้ GPT-mini (OpenAI API)
     """
-    # ข้อมูลจำลองสำหรับการทดสอบ
-    mock_data = (
-        "1. ครีมกันแดด ABC - ยอดขาย 150 ชิ้น\n"
-        "2. เสื้อยืดมินิมอล - ยอดขาย 120 ชิ้น\n"
-        "3. แก้วเก็บความเย็น - ยอดขาย 85 ชิ้น"
-    )
-    return mock_data
-
-def send_telegram_message(message):
-    """
-    ฟังก์ชันสำหรับส่งข้อความไปยัง Telegram
-    """
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
     payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': message
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "คุณคือผู้เชี่ยวชาญด้าน E-commerce และ TikTok Shop วิเคราะห์และสรุปเทรนด์สินค้าขายดีรายวัน ตอบเป็นภาษาไทยให้อ่านง่าย กระชับ เหมาะกับการส่งใน Telegram"},
+            {"role": "user", "content": "ช่วยรายงานสินค้าขายดีบน TikTok วันนี้ 3-5 อันดับ พร้อมบอกเหตุผลสั้นๆ ที่ฮิต และจำลองตัวเลขยอดขายรายวันให้ด้วย"}
+        ],
+        "temperature": 0.7
     }
     
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
-        print(f"[{datetime.now()}] ส่งรายงานสำเร็จ!")
+        data = response.json()
+        return data['choices'][0]['message']['content']
     except Exception as e:
-        print(f"[{datetime.now()}] เกิดข้อผิดพลาดในการส่ง: {e}")
+        print(f"[{datetime.now()}] ข้อผิดพลาด OpenAI API: {e}")
+        return "⚠️ ไม่สามารถดึงข้อมูลสินค้าขายดีจาก GPT ได้ในขณะนี้"
+
+def send_telegram_message(message):
+    """
+    ฟังก์ชันสำหรับส่งข้อความไปยัง Telegram อัตโนมัติ
+    """
+    try:
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        print(f"[{datetime.now()}] ส่งรายงานอัตโนมัติสำเร็จ!")
+    except Exception as e:
+        print(f"[{datetime.now()}] เกิดข้อผิดพลาดในการส่งอัตโนมัติ: {e}")
 
 def daily_job():
     """
-    งานที่จะให้ทำทุกวัน
+    งานที่จะให้ทำทุกวันเวลา 04:30
     """
-    print("กำลังดึงข้อมูลและส่งรายงาน...")
-    
-    # 1. ดึงข้อมูล
+    print("กำลังดึงข้อมูลและส่งรายงานอัตโนมัติ...")
     data = get_tiktok_best_sellers()
-    
-    # 2. จัดรูปแบบข้อความ
     today_date = datetime.now().strftime('%Y-%m-%d')
     message = f"📊 **รายงานสินค้าขายดี TikTok ประจำวัน** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
-    
-    # 3. ส่งข้อความ
     send_telegram_message(message)
 
 # =================การตั้งเวลา=================
-# ตั้งเวลาให้ทำงานทุกวันเวลา 04:30 
 schedule.every().day.at("04:30").do(daily_job)
 
-print("บอทเริ่มทำงานแล้ว... รอเวลาส่งรายงาน (04:30 น.)")
+def run_scheduler():
+    print("ระบบตั้งเวลาเริ่มทำงานแล้ว... รอเวลาส่งรายงาน (04:30 น.)")
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
 
-# Loop ให้โปรแกรมทำงานค้างไว้ตลอดเวลาเพื่อรอให้ถึงเวลา
-while True:
-    schedule.run_pending()
-    time.sleep(60) # เช็คเวลาทุกๆ 60 วินาทีเพื่อไม่ให้กินทรัพยากรเครื่องเกินไป
+# =================สร้างเมนูบอท=================
+@bot.message_handler(commands=['start', 'menu'])
+def send_menu(message):
+    # สร้างคีย์บอร์ดปุ่มกด
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    btn1 = KeyboardButton("📊 ขอรายงานวันนี้")
+    markup.add(btn1)
+    
+    bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == "📊 ขอรายงานวันนี้")
+def manual_report(message):
+    # ฟังก์ชันตอบสนองเมื่อผู้ใช้กดปุ่ม
+    bot.send_message(message.chat.id, "กำลังวิเคราะห์ข้อมูล... กรุณารอสักครู่ ⏳")
+    data = get_tiktok_best_sellers()
+    today_date = datetime.now().strftime('%Y-%m-%d')
+    report_message = f"📊 **รายงานสินค้าขายดี TikTok ประจำวัน** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
+    bot.send_message(message.chat.id, report_message)
+
+def run_bot_polling():
+    print("บอทพร้อมรับคำสั่งจากผู้ใช้แล้ว...")
+    while True:
+        try:
+            bot.polling(none_stop=True, interval=0, timeout=20)
+        except Exception as e:
+            print(f"[{datetime.now()}] Polling error: {e}")
+            time.sleep(15)
+
+if __name__ == '__main__':
+    # 1. เริ่มการทำงานของ schedule ใน background thread
+    t1 = threading.Thread(target=run_scheduler)
+    t1.start()
+    
+    # 2. เริ่มการทำงานของ Bot Polling (รอรับคำสั่งปุ่มกด)
+    t2 = threading.Thread(target=run_bot_polling)
+    t2.start()
+    
+    # 3. รัน Web Server สำหรับให้ Render ผูก Port
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
