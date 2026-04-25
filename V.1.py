@@ -33,8 +33,8 @@ def get_tiktok_best_sellers():
     payload = {
         "model": "gpt-4o-mini",
         "messages": [
-            {"role": "system", "content": "คุณคือผู้เชี่ยวชาญด้าน E-commerce และ TikTok Shop (ประเทศไทย) ทำหน้าที่วิเคราะห์เทรนด์สินค้าที่กำลังเป็นกระแสและสินค้าขายดีในตลาดไทยโดยเฉพาะ ตอบเป็นภาษาไทยให้อ่านง่าย กระชับ เหมาะกับการส่งใน Telegram"},
-            {"role": "user", "content": "ช่วยรายงาน 1. สินค้าที่ 'กำลังโดนดัน' หรือเป็นกระแสมาแรงใน TikTok ประเทศไทย ช่วงนี้ และ 2. สินค้าขายดีประจำวันในไทย รวม 3-5 อันดับ พร้อมบอกเหตุผลสั้นๆ ว่าทำไมถึงฮิตในกลุ่มคนไทย และให้คำแนะนำสำหรับพ่อค้าแม่ค้า (จำลองตัวเลขยอดขายในไทยเพื่อให้เห็นภาพด้วย)"}
+            {"role": "system", "content": "คุณคือผู้เชี่ยวชาญด้าน E-commerce และ TikTok Shop ประเทศไทย หน้าที่ของคุณคือวิเคราะห์และเจาะลึก 'สินค้าที่กำลังโดนดัน' และ 'สินค้าขายดี' ในตลาดไทยโดยเฉพาะ ตอบด้วยภาษาไทยที่อ่านง่าย เป็นมืออาชีพ มีการจัดรูปแบบ (เช่น Bullet หรือ Emoji) ให้เหมาะกับการอ่านบน Telegram"},
+            {"role": "user", "content": "ช่วยสรุปเทรนด์ TikTok ประเทศไทยวันนี้ แบ่งเป็น 2 ส่วน:\n1. 🔥 สินค้ากระแส/ระบบกำลังดัน (3 อันดับ)\n2. 💰 สินค้าขายดี (3 อันดับ)\nพร้อมบอกเหตุผลสั้นๆ ว่าทำไมคนไทยถึงชอบ และทริคเล็กๆ สำหรับนำไปทำคลิปขาย (จำลองตัวเลขยอดขายในไทยประกอบด้วย)"}
         ],
         "temperature": 0.7
     }
@@ -64,8 +64,8 @@ def daily_job():
     """
     print("กำลังดึงข้อมูลและส่งรายงานอัตโนมัติ...")
     data = get_tiktok_best_sellers()
-    today_date = datetime.now().strftime('%Y-%m-%d')
-    message = f"🔥 **รายงานสินค้ากระแสมาแรง & ขายดี TikTok** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
+    today_date = datetime.now().strftime('%d/%m/%Y')
+    message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
     send_telegram_message(message)
 
 # =================การตั้งเวลา=================
@@ -82,18 +82,18 @@ def run_scheduler():
 def send_menu(message):
     # สร้างคีย์บอร์ดปุ่มกด
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    btn1 = KeyboardButton("🔥 ดึงเทรนด์สินค้ากำลังดัน")
+    btn1 = KeyboardButton("📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
     markup.add(btn1)
     
     bot.send_message(message.chat.id, "ยินดีต้อนรับ! เลือกเมนูที่ต้องการได้เลยครับ 👇", reply_markup=markup)
 
-@bot.message_handler(func=lambda message: message.text == "🔥 ดึงเทรนด์สินค้ากำลังดัน")
+@bot.message_handler(func=lambda message: message.text == "📈 เช็คสินค้ากำลังดัน (TikTok ไทย)")
 def manual_report(message):
     # ฟังก์ชันตอบสนองเมื่อผู้ใช้กดปุ่ม
     bot.send_message(message.chat.id, "กำลังวิเคราะห์ข้อมูล... กรุณารอสักครู่ ⏳")
     data = get_tiktok_best_sellers()
-    today_date = datetime.now().strftime('%Y-%m-%d')
-    report_message = f"🔥 **รายงานสินค้ากระแสมาแรง & ขายดี TikTok** ({today_date}):\n\n{data}\n\n💡 โชคดีกับยอดขายวันนี้ครับ!"
+    today_date = datetime.now().strftime('%d/%m/%Y')
+    report_message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
     bot.send_message(message.chat.id, report_message)
 
 def run_bot_polling():
