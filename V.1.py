@@ -1,6 +1,5 @@
 import os
 import requests
-import schedule
 import time
 import threading
 from datetime import datetime
@@ -99,25 +98,6 @@ def send_telegram_message(message):
         print(f"[{datetime.now()}] ส่งรายงานอัตโนมัติสำเร็จ!")
     except Exception as e:
         print(f"[{datetime.now()}] เกิดข้อผิดพลาดในการส่งอัตโนมัติ: {e}")
-
-def daily_job():
-    """
-    งานที่จะให้ทำทุกวันเวลา 04:30
-    """
-    print("กำลังดึงข้อมูลและส่งรายงานอัตโนมัติ...")
-    data = get_tiktok_best_sellers("รายวัน", "ทั้งหมด")
-    today_date = datetime.now().strftime('%d/%m/%Y')
-    message = f"🇹🇭📈 **รายงานเจาะลึกเทรนด์ TikTok ไทย (รายวัน | รวมทุกหมวดหมู่) ประจำวันที่ {today_date}**\n\n{data}\n\n💡 _อัปเดตข้อมูลเพื่อให้คุณไม่พลาดทุกกระแส!_"
-    send_telegram_message(message)
-
-# =================การตั้งเวลา=================
-schedule.every().day.at("04:30").do(daily_job)
-
-def run_scheduler():
-    print("ระบบตั้งเวลาเริ่มทำงานแล้ว... รอเวลาส่งรายงาน (04:30 น.)")
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
 
 # =================สร้างเมนูบอท=================
 @bot.message_handler(commands=['start', 'menu'])
@@ -224,9 +204,6 @@ def run_bot_polling():
             time.sleep(15)
 
 if __name__ == '__main__':
-    t1 = threading.Thread(target=run_scheduler)
-    t1.start()
-    
     t2 = threading.Thread(target=run_bot_polling)
     t2.start()
     
